@@ -25,9 +25,6 @@ jobs:
               # If you want to serve this as your main github page, remove public url
               run: trunk build --release --public-url='nertz'
 
-            - name: Create CNAME
-              run: echo nertz.pro>dist/CNAME
-
             - name: Deploy
               uses: peaceiris/actions-gh-pages@v3
               if: github.ref == 'refs/heads/main'
