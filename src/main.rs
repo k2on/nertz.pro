@@ -13,8 +13,9 @@ const KEY: &str = "yew.nertzpro.self";
 pub enum Msg {
     PlayerAdd(String),
     PlayerRemove(usize),
-    GameStart,
     ScoreEnter(PlayerId, Score),
+    GameStart,
+    GameNew,
 }
 
 pub struct App {
@@ -50,6 +51,9 @@ impl Component for App {
                 self.state.is_game_started = true;
             }
             Msg::ScoreEnter(_, _) => todo!(),
+            Msg::GameNew => {
+                self.state = State::new();
+            }
         }
         LocalStorage::set(KEY, &self.state).expect("failed to set");
         true
@@ -61,13 +65,21 @@ impl Component for App {
                 <h2>{"NERTZ.PRO"}</h2>
                 { if self.state.is_game_started {
                     html! {
-                        <table>
-                        <tr>
-                        { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
-                        </tr>
-                        </table>
-
-
+                        <>
+                            <table class="scores">
+                                <tr>
+                                { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
+                                </tr>
+                                { for self.state.rounds.iter().map(|round| html! {
+                                    <tr>
+                                        { for round.scores.iter().map(|score| html! {
+                                            <td>{score}</td>
+                                        })}
+                                    </tr>
+                                }) }
+                            </table>
+                            { self.view_new_game_button(ctx.link()) }
+                        </>
                     }
                 } else {
                     html! {
@@ -123,6 +135,12 @@ impl App {
     fn view_start_game_button(&self, link: &Scope<Self>) -> Html {
         html! {
             <button class="start" onclick={link.callback(move |_| Msg::GameStart)}>{"START GAME"}</button>
+        }
+    }
+
+    fn view_new_game_button(&self, link: &Scope<Self>) -> Html {
+        html! {
+            <button class="new" onclick={link.callback(move |_| Msg::GameNew)}>{"new game"}</button>
         }
     }
 }

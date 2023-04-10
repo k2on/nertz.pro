@@ -13,7 +13,11 @@ impl State {
         State {
             players: Vec::new(),
             first_to: 100,
-            rounds: Vec::new(),
+            rounds: vec![
+                // Round {
+                // scores: vec![40, 40, 40, 40],
+                // }
+            ],
             is_game_started: false,
         }
     }
