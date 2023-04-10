@@ -239,7 +239,7 @@ impl Component for ComponentScore {
                             }
                         } else {
                             html! {
-                                <span></span>
+                                <span>{"--"}</span>
                             }
                         }
                     }
