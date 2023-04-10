@@ -229,8 +229,18 @@ impl Component for ComponentScore {
                     if self.editing {
                         html! { <input {onkeypress} ref={self.input_ref.clone()} type="number" /> }
                     } else {
-                        html! {
-                            { self.props.score.map_or_else(|| "--".to_owned(), |score| score.to_string()) }
+                        if let Some(score) = self.props.score {
+                            let mut class = Classes::from("score");
+                            if score < 0 {
+                                class.push("red");
+                            }
+                            html! {
+                                <span {class}>{score.to_string()}</span>
+                            }
+                        } else {
+                            html! {
+                                <span></span>
+                            }
                         }
                     }
                 }
