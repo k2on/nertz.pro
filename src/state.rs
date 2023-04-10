@@ -13,17 +13,19 @@ impl State {
         State {
             players: Vec::new(),
             first_to: 100,
-            rounds: vec![
-                // Round {
-                // scores: vec![40, 40, 40, 40],
-                // }
-            ],
+            rounds: Vec::new(),
             is_game_started: false,
         }
     }
 
     pub fn player_remove(&mut self, idx: usize) {
         self.players.remove(idx);
+    }
+
+    pub fn next_round(&mut self) {
+        self.rounds.push(Round {
+            scores: std::iter::repeat(None).take(self.players.len()).collect(),
+        });
     }
 }
 
@@ -40,6 +42,6 @@ pub struct Round {
     pub scores: Vec<Score>,
 }
 
-pub type Score = i8;
+pub type Score = Option<i8>;
 
 impl State {}

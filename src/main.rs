@@ -1,10 +1,13 @@
 use gloo::storage::{LocalStorage, Storage};
-use state::{Player, PlayerId, Score, State};
+use state::{Player, PlayerId, Round, Score, State};
 use strum::IntoEnumIterator;
-use web_sys::HtmlInputElement as InputElement;
+use web_sys::{HtmlInputElement, Node};
 use yew::events::{FocusEvent, KeyboardEvent};
 use yew::html::Scope;
-use yew::{classes, html, Classes, Component, Context, Html, NodeRef, TargetCast};
+use yew::{
+    classes, html, use_state, Callback, Classes, Component, Context, Html, NodeRef, Properties,
+    TargetCast,
+};
 
 mod state;
 
@@ -13,7 +16,7 @@ const KEY: &str = "yew.nertzpro.self";
 pub enum Msg {
     PlayerAdd(String),
     PlayerRemove(usize),
-    ScoreEnter(PlayerId, Score),
+    ScoreEnter(usize, usize, i8),
     GameStart,
     GameNew,
 }
@@ -49,8 +52,11 @@ impl Component for App {
             }
             Msg::GameStart => {
                 self.state.is_game_started = true;
+                self.state.next_round();
             }
-            Msg::ScoreEnter(_, _) => todo!(),
+            Msg::ScoreEnter(round_idx, player_idx, score) => {
+                self.state.rounds[round_idx].scores[player_idx] = Some(score);
+            }
             Msg::GameNew => {
                 self.state = State::new();
             }
@@ -62,7 +68,7 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
             <div class="nertzpro">
-                <h2>{"NERTZ.PRO"}</h2>
+                <img id="logo" src="static/logo.png" alt="NERTS.PRO"/>
                 { if self.state.is_game_started {
                     html! {
                         <>
@@ -70,11 +76,10 @@ impl Component for App {
                                 <tr>
                                 { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
                                 </tr>
-                                { for self.state.rounds.iter().map(|round| html! {
+                                { for self.state.rounds.iter().enumerate().map(|(i, round)| html! {
                                     <tr>
-                                        { for round.scores.iter().map(|score| html! {
-                                            <td>{score}</td>
-                                        })}
+                                        { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore update_score={ctx.link().callback(|(r, p, s)| Msg::ScoreEnter(r, p, s) )} round_idx={i} player_idx={j} score={score}/> }) }
+                                        // { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore update_score={Callback::from(|(round, player, score)| Msg::ScoreEnter(round, player, score))} round_idx={i} player_idx={j} score={score}/> }) }
                                     </tr>
                                 }) }
                             </table>
@@ -103,7 +108,7 @@ impl App {
     fn view_input(&self, link: &Scope<Self>) -> Html {
         let onkeypress = link.batch_callback(|e: KeyboardEvent| {
             if e.key() == "Enter" {
-                let input: InputElement = e.target_unchecked_into();
+                let input: HtmlInputElement = e.target_unchecked_into();
                 let value = input.value();
                 input.set_value("");
                 Some(Msg::PlayerAdd(value))
@@ -141,6 +146,95 @@ impl App {
     fn view_new_game_button(&self, link: &Scope<Self>) -> Html {
         html! {
             <button class="new" onclick={link.callback(move |_| Msg::GameNew)}>{"new game"}</button>
+        }
+    }
+}
+
+struct ComponentScore {
+    props: PropsScore,
+    editing: bool,
+    input_ref: NodeRef,
+}
+
+#[derive(Properties, Clone, PartialEq)]
+struct PropsScore {
+    score: Score,
+    round_idx: usize,
+    player_idx: usize,
+    update_score: Callback<(usize, usize, i8)>,
+}
+
+enum ScoreMsg {
+    ToggleEditing,
+    UpdateScore(i8),
+}
+
+impl Component for ComponentScore {
+    type Message = ScoreMsg;
+    type Properties = PropsScore;
+
+    fn create(ctx: &Context<Self>) -> Self {
+        Self {
+            props: ctx.props().clone(),
+            editing: false,
+            input_ref: NodeRef::default(),
+        }
+    }
+
+    fn rendered(&mut self, _ctx: &Context<Self>, first_render: bool) {
+        if let Some(input) = self.input_ref.cast::<HtmlInputElement>() {
+            if self.editing {
+                input.focus();
+            }
+        }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            ScoreMsg::ToggleEditing => {
+                self.editing = true;
+                true
+            }
+            ScoreMsg::UpdateScore(val) => {
+                self.props.score = Some(val);
+                self.editing = false;
+                true
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let onclick = ctx.link().callback(|_| ScoreMsg::ToggleEditing);
+
+        let update_score = self.props.update_score.clone();
+        let round_idx = self.props.round_idx;
+        let player_idx = self.props.player_idx;
+
+        let onkeypress = ctx.link().batch_callback(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                let input: HtmlInputElement = e.target_unchecked_into();
+                let value = input.value().parse::<i8>().unwrap();
+
+                update_score.emit((round_idx, player_idx, value));
+
+                Some(ScoreMsg::UpdateScore(value))
+            } else {
+                None
+            }
+        });
+
+        html! {
+            <td {onclick}>
+                {
+                    if self.editing {
+                        html! { <input {onkeypress} ref={self.input_ref.clone()} type="number" /> }
+                    } else {
+                        html! {
+                            { self.props.score.map_or_else(|| "--".to_owned(), |score| score.to_string()) }
+                        }
+                    }
+                }
+            </td>
         }
     }
 }
