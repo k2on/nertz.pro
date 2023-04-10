@@ -679,7 +679,7 @@ function initSync(module) {
 
 async function init(input) {
     if (typeof input === 'undefined') {
-        input = new URL('nertz-29ccefc81aff2f75_bg.wasm', import.meta.url);
+        input = new URL('nertz-688f1577aeb838a1_bg.wasm', import.meta.url);
     }
     const imports = getImports();
 
