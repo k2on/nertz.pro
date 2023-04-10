@@ -7,3 +7,14 @@ edition = "2021"
 
 [dependencies]
 yew = { version = "0.20.0", features = ["csr"] }
+strum = "0.24"
+strum_macros = "0.24"
+serde = "1"
+serde_derive = "1"
+gloo = "0.8"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+	"HtmlInputElement",
+]
