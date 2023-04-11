@@ -54,6 +54,7 @@ const KEY: &str = "yew.nertzpro.self";
 
 pub enum AppMsg {
     ScoreEnter(usize, usize, i8),
+    ScoreEdit(usize, usize),
     GameNew,
     GameStart,
     PlayerAdd(String),
@@ -62,16 +63,21 @@ pub enum AppMsg {
 
 impl App {
     pub fn get_focused(&self) -> String {
-        let (last_round_idx, last_round) = self.state.scores.iter().enumerate().nth(0).unwrap();
-
-        let (player_idx, _) = last_round
+        let (round, player) = self
+            .state
+            .scores
             .iter()
             .enumerate()
-            .filter(|(_, score)| score.is_editing)
-            .nth(0)
-            .unwrap();
+            .find_map(|(round_idx, round)| {
+                round
+                    .iter()
+                    .enumerate()
+                    .position(|(_, score)| score.is_editing)
+                    .map(|player_idx| (round_idx, player_idx))
+            })
+            .unwrap_or((0, 0)); // You can use any default value here, (-1, -1) is just an example
 
-        format!("{}_{}", last_round_idx, player_idx)
+        format!("{}_{}", round, player)
     }
 
     fn next_round(&mut self) {
@@ -115,6 +121,14 @@ impl App {
             </li>
         }
     }
+
+    fn get_next_empty(&mut self) -> Option<&mut Score> {
+        self.state
+            .scores
+            .iter_mut()
+            .rev()
+            .find_map(|round| round.iter_mut().find(|score| score.val.is_none()))
+    }
 }
 
 fn make_refs(state: &State) -> HashMap<String, NodeRef> {
@@ -157,12 +171,27 @@ impl Component for App {
                     val: Some(score),
                     is_editing: false,
                 };
-                if let Some(score) = self.state.scores[round].get_mut(player + 1) {
+                if let Some(score) = self.get_next_empty() {
                     score.is_editing = true;
                 } else {
                     self.next_round();
                 }
             }
+            AppMsg::ScoreEdit(round_idx_edit, player_idx_edit) => self
+                .state
+                .scores
+                .iter_mut()
+                .enumerate()
+                .for_each(|(round_idx, round)| {
+                    round
+                        .iter_mut()
+                        .enumerate()
+                        .for_each(|(player_idx, score)| {
+                            let should_edit =
+                                round_idx == round_idx_edit && player_idx == player_idx_edit;
+                            score.is_editing = should_edit;
+                        })
+                }),
             AppMsg::GameNew => {
                 let players = self.state.players.clone();
                 self.state = State::new();
@@ -213,8 +242,12 @@ impl Component for App {
                             }
                         });
 
+                        let onclick = ctx.link().callback(move |_| {
+                            AppMsg::ScoreEdit(round_idx, player_idx)
+                        });
+
                         html! {
-                            <td>
+                            <td {onclick}>
                             {if score.is_editing {
                                 html! {
                                     <input ref={node_ref} {onkeypress} value={if let Some(s) = score.val { s.to_string() } else { String::new() }} type="number"/>
