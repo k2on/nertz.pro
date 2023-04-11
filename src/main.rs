@@ -48,6 +48,27 @@ impl State {
         round[0].is_editing = true;
         self.scores.insert(0, round);
     }
+
+    fn player_sum(&self, idx: usize) -> i8 {
+        self.scores
+            .iter()
+            .filter_map(|round| {
+                if let Some(val) = round[idx].val {
+                    Some(val)
+                } else {
+                    None
+                }
+            })
+            .sum()
+    }
+
+    fn is_game_over(&self) -> bool {
+        self.players
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| self.player_sum(idx))
+            .any(|score| score >= self.first_to as i8)
+    }
 }
 
 const KEY: &str = "yew.nertzpro.self";
@@ -106,7 +127,7 @@ impl App {
         html! {
             <input
                 class="new-player"
-                placeholder="Player Name"
+                placeholder="Add player"
                 {onkeypress}
             />
         }
@@ -117,8 +138,17 @@ impl App {
         html! {
             <li>
                 <label>{player}</label>
-                <button {onclick}>{"x"}</button>
+                <button class="remove" {onclick}>{"x"}</button>
             </li>
+        }
+    }
+
+    fn view_player_sum(&self, idx: usize) -> Html {
+        let sum = self.state.player_sum(idx);
+        html! {
+            <div>
+                {sum}
+            </div>
         }
     }
 
@@ -173,7 +203,7 @@ impl Component for App {
                 };
                 if let Some(score) = self.get_next_empty() {
                     score.is_editing = true;
-                } else {
+                } else if !self.state.is_game_over() {
                     self.next_round();
                 }
             }
@@ -222,7 +252,7 @@ impl Component for App {
                 <table class="scores">
 
                 <tr>
-                    { for self.state.players.iter().map(|player| html! { <td>{player.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
+                    { for self.state.players.iter().enumerate().map(|(idx, player)| html! { <td>{player.clone().chars().nth(0).unwrap().to_uppercase()}{self.view_player_sum(idx)}</td> }) }
                 </tr>
 
                 { for self.state.scores.iter().enumerate().map(|(round_idx, round)| html! {
