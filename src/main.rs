@@ -14,6 +14,7 @@ struct State {
     players: Vec<Player>,
     scores: Vec<Vec<Score>>,
     is_in_progress: bool,
+    first_to: u8,
 }
 
 type Player = String;
@@ -33,6 +34,7 @@ impl State {
             players: Vec::new(),
             scores: Vec::new(),
             is_in_progress: false,
+            first_to: 100, // the game ends when a player hits this number
         }
     }
 
@@ -44,7 +46,7 @@ impl State {
         .take(self.players.len())
         .collect();
         round[0].is_editing = true;
-        self.scores.push(round);
+        self.scores.insert(0, round);
     }
 }
 
@@ -60,7 +62,7 @@ pub enum AppMsg {
 
 impl App {
     pub fn get_focused(&self) -> String {
-        let (last_round_idx, last_round) = self.state.scores.iter().enumerate().last().unwrap();
+        let (last_round_idx, last_round) = self.state.scores.iter().enumerate().nth(0).unwrap();
 
         let (player_idx, _) = last_round
             .iter()
@@ -220,8 +222,13 @@ impl Component for App {
                             } else {
                                 html! {
                                     {if let Some(s) = score.val {
+                                        let mut class = Classes::from("score");
+                                        if s < 0 {
+                                            class.push("red");
+                                        }
+
                                         html! {
-                                            {s.to_string()}
+                                            <span {class}>{s.to_string()}</span>
                                         }
                                     } else {
                                         html! {
