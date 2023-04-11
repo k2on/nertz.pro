@@ -385,6 +385,7 @@ dependencies = [
  "gloo",
  "serde",
  "serde_derive",
+ "serde_json",
  "strum",
  "strum_macros",
  "web-sys",

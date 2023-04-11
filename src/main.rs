@@ -1,4 +1,8 @@
-use gloo::storage::{LocalStorage, Storage};
+use gloo::{
+    console,
+    storage::{LocalStorage, Storage},
+};
+use serde_json::to_string;
 use state::{Player, PlayerId, Round, Score, State};
 use strum::IntoEnumIterator;
 use web_sys::{HtmlInputElement, Node};
@@ -56,6 +60,17 @@ impl Component for App {
             }
             Msg::ScoreEnter(round_idx, player_idx, score) => {
                 self.state.rounds[round_idx].scores[player_idx] = Some(score);
+                let round_complete = self
+                    .state
+                    .rounds
+                    .last()
+                    .unwrap()
+                    .scores
+                    .iter()
+                    .all(|score| score.is_some());
+                if round_complete {
+                    self.state.next_round();
+                }
             }
             Msg::GameNew => {
                 self.state = State::new();
@@ -66,6 +81,8 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
+        console::log!(to_string(&self.state).unwrap());
+
         html! {
             <div class="nertzpro">
                 <img id="logo" src="static/logo.png" alt="NERTS.PRO"/>
@@ -73,13 +90,14 @@ impl Component for App {
                     html! {
                         <>
                             <table class="scores">
-                                <tr>
-                                { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
-                                </tr>
+                                <thead>
+                                    <tr>
+                                    { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
+                                    </tr>
+                                </thead>
                                 { for self.state.rounds.iter().enumerate().map(|(i, round)| html! {
                                     <tr>
-                                        { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore update_score={ctx.link().callback(|(r, p, s)| Msg::ScoreEnter(r, p, s) )} round_idx={i} player_idx={j} score={score}/> }) }
-                                        // { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore update_score={Callback::from(|(round, player, score)| Msg::ScoreEnter(round, player, score))} round_idx={i} player_idx={j} score={score}/> }) }
+                                        { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore key={format!("{}_{}", i, j)} update_score={ctx.link().callback(|(r, p, s)| Msg::ScoreEnter(r, p, s) )} round_idx={i} player_idx={j} score={score}/> }) }
                                     </tr>
                                 }) }
                             </table>
@@ -89,7 +107,7 @@ impl Component for App {
                 } else {
                     html! {
                         <>
-                            <ul class="todo-list">
+                            <ul class="player-list">
                                 { for self.state.players.iter().enumerate().map(|e| self.view_entry(e, ctx.link())) }
                             </ul>
                             { self.view_input(ctx.link()) }
@@ -203,6 +221,10 @@ impl Component for ComponentScore {
         }
     }
 
+    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        true
+    }
+
     fn view(&self, ctx: &Context<Self>) -> Html {
         let onclick = ctx.link().callback(|_| ScoreMsg::ToggleEditing);
 
@@ -216,7 +238,6 @@ impl Component for ComponentScore {
                 let value = input.value().parse::<i8>().unwrap();
 
                 update_score.emit((round_idx, player_idx, value));
-
                 Some(ScoreMsg::UpdateScore(value))
             } else {
                 None
