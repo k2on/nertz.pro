@@ -1,79 +1,132 @@
+use std::{borrow::BorrowMut, collections::HashMap, hash::Hash, vec};
+
 use gloo::{
     console,
     storage::{LocalStorage, Storage},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use state::{Player, PlayerId, Round, Score, State};
-use strum::IntoEnumIterator;
-use web_sys::{HtmlInputElement, Node};
-use yew::events::{FocusEvent, KeyboardEvent};
-use yew::html::Scope;
-use yew::{
-    classes, html, use_state, Callback, Classes, Component, Context, Html, NodeRef, Properties,
-    TargetCast,
-};
+use web_sys::HtmlInputElement;
+use yew::prelude::*;
 
-mod state;
-
-const KEY: &str = "yew.nertzpro.self";
-
-pub enum Msg {
-    PlayerAdd(String),
-    PlayerRemove(usize),
-    ScoreEnter(usize, usize, i8),
-    GameStart,
-    GameNew,
+#[derive(Debug, Serialize, Deserialize)]
+struct State {
+    players: Vec<String>,
+    scores: Vec<Vec<Score>>,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Score {
+    val: Option<i8>,
+    is_editing: bool,
 }
 
 pub struct App {
     state: State,
-    focus_ref: NodeRef,
+    refs: HashMap<String, NodeRef>,
+}
+impl State {
+    pub fn new() -> Self {
+        Self {
+            players: Vec::new(),
+            scores: Vec::new(),
+        }
+    }
+
+    fn next_round(&mut self) {
+        let mut round: Vec<Score> = std::iter::repeat(Score {
+            val: None,
+            is_editing: false,
+        })
+        .take(self.players.len())
+        .collect();
+        round[0].is_editing = true;
+        self.scores.push(round);
+    }
+}
+
+const KEY: &str = "yew.nertzpro.self";
+
+pub enum AppMsg {
+    ScoreEnter(usize, usize, i8),
+}
+
+impl App {
+    pub fn get_focused(&self) -> String {
+        let (last_round_idx, last_round) = self.state.scores.iter().enumerate().last().unwrap();
+
+        let (player_idx, _) = last_round
+            .iter()
+            .enumerate()
+            .filter(|(_, score)| score.is_editing)
+            .nth(0)
+            .unwrap();
+
+        format!("{}_{}", last_round_idx, player_idx)
+    }
+
+    fn next_round(&mut self) {
+        self.state.next_round();
+        for (round_idx, round) in self.state.scores.iter().enumerate() {
+            for (player_idx, _) in round.iter().enumerate() {
+                let key = format!("{}_{}", round_idx, player_idx);
+                if let None = self.refs.get(&key) {
+                    self.refs.insert(key, NodeRef::default());
+                }
+            }
+        }
+    }
 }
 
 impl Component for App {
-    type Message = Msg;
+    type Message = AppMsg;
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
-        let state = LocalStorage::get(KEY).unwrap_or_else(|_| State::new());
-        let focus_ref = NodeRef::default();
-        Self { state, focus_ref }
+    fn create(ctx: &Context<Self>) -> Self {
+        let mut state = LocalStorage::get(KEY).unwrap_or_else(|_| State::new());
+
+        state.players.push("Max".to_owned());
+        state.players.push("Bella".to_owned());
+
+        state.scores.push(vec![
+            Score {
+                val: None,
+                is_editing: true,
+            },
+            Score {
+                val: None,
+                is_editing: false,
+            },
+        ]);
+
+        Self {
+            state,
+            refs: HashMap::from([
+                (String::from("0_0"), NodeRef::default()),
+                (String::from("0_1"), NodeRef::default()),
+            ]),
+        }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
+        let node_ref = self.refs.get(&self.get_focused()).unwrap();
+
+        if let Some(input) = node_ref.cast::<HtmlInputElement>() {
+            input.focus();
+        }
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::PlayerAdd(name) => {
-                if !name.is_empty() {
-                    let player = Player {
-                        id: self.state.players.len() as u32,
-                        name,
-                    };
-                    self.state.players.push(player);
+            AppMsg::ScoreEnter(round, player, score) => {
+                self.state.scores[round][player] = Score {
+                    val: Some(score),
+                    is_editing: false,
+                };
+                if let Some(score) = self.state.scores[round].get_mut(player + 1) {
+                    score.is_editing = true;
+                } else {
+                    self.next_round();
                 }
-            }
-            Msg::PlayerRemove(idx) => {
-                self.state.player_remove(idx);
-            }
-            Msg::GameStart => {
-                self.state.is_game_started = true;
-                self.state.next_round();
-            }
-            Msg::ScoreEnter(round_idx, player_idx, score) => {
-                self.state.rounds[round_idx].scores[player_idx] = Some(score);
-                let round_complete = self
-                    .state
-                    .rounds
-                    .last()
-                    .unwrap()
-                    .scores
-                    .iter()
-                    .all(|score| score.is_some());
-                if round_complete {
-                    self.state.next_round();
-                }
-            }
-            Msg::GameNew => {
-                self.state = State::new();
             }
         }
         LocalStorage::set(KEY, &self.state).expect("failed to set");
@@ -81,191 +134,56 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        console::log!(to_string(&self.state).unwrap());
-
         html! {
-            <div class="nertzpro">
-                <img id="logo" src="static/logo.png" alt="NERTS.PRO"/>
-                { if self.state.is_game_started {
+            <table>
+
+            <tr>
+                { for self.state.players.iter().map(|player| html! { <td>{player.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
+            </tr>
+
+            { for self.state.scores.iter().enumerate().map(|(round_idx, round)| html! {
+                <tr>
+                { for round.iter().enumerate().map(|(player_idx, score)| {
+
+                    let key = format!("{}_{}", round_idx, player_idx);
+                    let node_ref = self.refs.get(&key).unwrap();
+
+                    let onkeypress = ctx.link().batch_callback(move |e: KeyboardEvent| {
+                        if e.key() == "Enter" {
+                            let input: HtmlInputElement = e.target_unchecked_into();
+                            let val = input.value().parse::<i8>().unwrap();
+                            Some(AppMsg::ScoreEnter(round_idx, player_idx, val))
+                        } else {
+                            None
+                        }
+                    });
+
                     html! {
-                        <>
-                            <table class="scores">
-                                <thead>
-                                    <tr>
-                                    { for self.state.players.iter().map(|player| html! { <td>{player.name.clone().chars().nth(0).unwrap().to_uppercase()}</td> }) }
-                                    </tr>
-                                </thead>
-                                { for self.state.rounds.iter().enumerate().map(|(i, round)| html! {
-                                    <tr>
-                                        { for round.scores.iter().enumerate().map(|(j, score)| html! { <ComponentScore key={format!("{}_{}", i, j)} update_score={ctx.link().callback(|(r, p, s)| Msg::ScoreEnter(r, p, s) )} round_idx={i} player_idx={j} score={score}/> }) }
-                                    </tr>
-                                }) }
-                            </table>
-                            { self.view_new_game_button(ctx.link()) }
-                        </>
-                    }
-                } else {
-                    html! {
-                        <>
-                            <ul class="player-list">
-                                { for self.state.players.iter().enumerate().map(|e| self.view_entry(e, ctx.link())) }
-                            </ul>
-                            { self.view_input(ctx.link()) }
-                            <div>
-                                { self.view_start_game_button(ctx.link()) }
-                            </div>
-                        </>
-                    }
-                } }
-            </div>
-        }
-    }
-}
-
-impl App {
-    fn view_input(&self, link: &Scope<Self>) -> Html {
-        let onkeypress = link.batch_callback(|e: KeyboardEvent| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value();
-                input.set_value("");
-                Some(Msg::PlayerAdd(value))
-            } else {
-                None
-            }
-        });
-        html! {
-            <input
-                class="new-player"
-                placeholder="Player Name"
-                {onkeypress}
-            />
-        }
-    }
-
-    fn view_entry(&self, (idx, player): (usize, &Player), link: &Scope<Self>) -> Html {
-        let mut class = Classes::from("todo");
-        html! {
-            <li {class}>
-                <div class="view">
-                    <label>{ &player.name }</label>
-                    <button class="destroy" onclick={link.callback(move |_| Msg::PlayerRemove(idx))}>{"x"}</button>
-                </div>
-            </li>
-        }
-    }
-
-    fn view_start_game_button(&self, link: &Scope<Self>) -> Html {
-        html! {
-            <button class="start" onclick={link.callback(move |_| Msg::GameStart)}>{"START GAME"}</button>
-        }
-    }
-
-    fn view_new_game_button(&self, link: &Scope<Self>) -> Html {
-        html! {
-            <button class="new" onclick={link.callback(move |_| Msg::GameNew)}>{"new game"}</button>
-        }
-    }
-}
-
-struct ComponentScore {
-    props: PropsScore,
-    editing: bool,
-    input_ref: NodeRef,
-}
-
-#[derive(Properties, Clone, PartialEq)]
-struct PropsScore {
-    score: Score,
-    round_idx: usize,
-    player_idx: usize,
-    update_score: Callback<(usize, usize, i8)>,
-}
-
-enum ScoreMsg {
-    ToggleEditing,
-    UpdateScore(i8),
-}
-
-impl Component for ComponentScore {
-    type Message = ScoreMsg;
-    type Properties = PropsScore;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        Self {
-            props: ctx.props().clone(),
-            editing: false,
-            input_ref: NodeRef::default(),
-        }
-    }
-
-    fn rendered(&mut self, _ctx: &Context<Self>, first_render: bool) {
-        if let Some(input) = self.input_ref.cast::<HtmlInputElement>() {
-            if self.editing {
-                input.focus();
-            }
-        }
-    }
-
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            ScoreMsg::ToggleEditing => {
-                self.editing = true;
-                true
-            }
-            ScoreMsg::UpdateScore(val) => {
-                self.props.score = Some(val);
-                self.editing = false;
-                true
-            }
-        }
-    }
-
-    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
-        true
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let onclick = ctx.link().callback(|_| ScoreMsg::ToggleEditing);
-
-        let update_score = self.props.update_score.clone();
-        let round_idx = self.props.round_idx;
-        let player_idx = self.props.player_idx;
-
-        let onkeypress = ctx.link().batch_callback(move |e: KeyboardEvent| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value().parse::<i8>().unwrap();
-
-                update_score.emit((round_idx, player_idx, value));
-                Some(ScoreMsg::UpdateScore(value))
-            } else {
-                None
-            }
-        });
-
-        html! {
-            <td {onclick}>
-                {
-                    if self.editing {
-                        html! { <input {onkeypress} ref={self.input_ref.clone()} type="number" /> }
-                    } else {
-                        if let Some(score) = self.props.score {
-                            let mut class = Classes::from("score");
-                            if score < 0 {
-                                class.push("red");
-                            }
+                        <td>
+                        {if score.is_editing {
                             html! {
-                                <span {class}>{score.to_string()}</span>
+                                <input ref={node_ref} {onkeypress} value={if let Some(s) = score.val { s.to_string() } else { String::new() }} type="number"/>
                             }
                         } else {
                             html! {
-                                <span>{"--"}</span>
+                                {if let Some(s) = score.val {
+                                    html! {
+                                        {s.to_string()}
+                                    }
+                                } else {
+                                    html! {
+                                        {"--"}
+                                    }
+                                }}
                             }
-                        }
+                        }}
+                        </td>
                     }
-                }
-            </td>
+                })}
+                </tr>
+            }) }
+
+            </table>
         }
     }
 }
