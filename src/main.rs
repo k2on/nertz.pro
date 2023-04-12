@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, collections::HashMap, hash::Hash, vec};
+use std::collections::HashMap;
 
 use gloo::{
     console,
@@ -27,7 +27,11 @@ struct Score {
 pub struct App {
     state: State,
     refs: HashMap<String, NodeRef>,
+    leaderboard: Leaderboard,
 }
+
+type Leaderboard = Vec<usize>;
+
 impl State {
     pub fn new() -> Self {
         Self {
@@ -63,15 +67,50 @@ impl State {
     }
 
     fn is_game_over(&self) -> bool {
+        if self
+            .scores
+            .clone()
+            .iter_mut()
+            .any(|round| round.iter_mut().any(|score| score.val.is_none()))
+        {
+            return false;
+        }
+
         let mut scores = self
             .players
             .iter()
             .enumerate()
             .map(|(idx, _)| self.player_sum(idx));
+
+        console::log!(to_string(&format!("{:?}", scores.clone().collect::<Vec<i8>>())).unwrap());
         let max = &scores.clone().max().unwrap();
+        let h = scores
+            .clone()
+            .filter(|score| score.eq(max))
+            .collect::<Vec<i8>>();
+
+        console::log!(to_string(&format!("{:?}", h)).unwrap());
+
         let game_has_reached_max_score = scores.any(|score| score >= self.first_to as i8);
-        let no_tie = scores.filter(|score| score.eq(max)).count().ne(&1);
+
+        console::log!(to_string(&format!("{:?}", h.iter().count())).unwrap());
+
+        let no_tie = h.iter().count().eq(&1);
+
+        console::log!(to_string(&format!("{} {}", game_has_reached_max_score, no_tie)).unwrap());
+
         game_has_reached_max_score && no_tie
+    }
+
+    fn get_leader_board(&self) -> Leaderboard {
+        let mut scores = self
+            .players
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| (idx, self.player_sum(idx)))
+            .collect::<Vec<(usize, i8)>>();
+        scores.sort_by(|(_, a), (_, b)| b.cmp(a));
+        scores.iter().map(|(player_idx, _)| *player_idx).collect()
     }
 }
 
@@ -180,25 +219,30 @@ impl Component for App {
     type Message = AppMsg;
     type Properties = ();
 
-    fn create(ctx: &Context<Self>) -> Self {
-        let mut state = LocalStorage::get(KEY).unwrap_or_else(|_| State::new());
+    fn create(_ctx: &Context<Self>) -> Self {
+        let state = LocalStorage::get(KEY).unwrap_or_else(|_| State::new());
 
         let refs = make_refs(&state);
+        let leaderboard = state.get_leader_board();
 
-        Self { state, refs }
+        Self {
+            state,
+            refs,
+            leaderboard,
+        }
     }
 
-    fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
+    fn rendered(&mut self, _ctx: &Context<Self>, _first_render: bool) {
         if self.state.is_in_progress {
             let node_ref = self.refs.get(&self.get_focused()).unwrap();
 
             if let Some(input) = node_ref.cast::<HtmlInputElement>() {
-                input.focus();
+                input.focus().unwrap();
             }
         }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             AppMsg::ScoreEnter(round, player, score) => {
                 self.state.scores[round][player] = Score {
@@ -240,12 +284,15 @@ impl Component for App {
                 self.state.players.remove(idx);
             }
         }
+        self.leaderboard = self.state.get_leader_board();
+
         LocalStorage::set(KEY, &self.state).expect("failed to set");
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         console::log!(to_string(&format!("{:?}", self.state)).unwrap());
+        let is_game_over = self.state.is_game_over();
 
         html! {
             <div>
@@ -256,7 +303,31 @@ impl Component for App {
                 <table class="scores">
 
                 <tr>
-                    { for self.state.players.iter().enumerate().map(|(idx, player)| html! { <td>{player.clone().chars().nth(0).unwrap().to_uppercase()}{self.view_player_sum(idx)}</td> }) }
+                    { for self.state.players.iter().enumerate().map(|(idx, player)| html! {
+                        <td>{if is_game_over {
+                            let (place_idx, _) = self.leaderboard.iter().enumerate().find(|(_, &p)| idx.eq(&p)).unwrap();
+
+                            let metal = match place_idx {
+                                0 => Some("gold"),
+                                1 => Some("silver"),
+                                2 => Some("bronze"),
+                                _ => None
+                            };
+                            if let Some(metal) = metal {
+                                let url = format!("static/{}.png", metal);
+                                html! {
+                                    <img class="metal" src={url}/>
+                                }
+                            } else {
+                                html! {}
+                            }
+                        } else {
+                            html! {}
+                        }}
+                        {player.clone().chars().nth(0).unwrap().to_uppercase()}
+                        {if is_game_over { html! { <><br/><br/></> } } else { html! {} }}
+                        {self.view_player_sum(idx)}</td>
+                    }) }
                 </tr>
 
                 { for self.state.scores.iter().enumerate().map(|(round_idx, round)| html! {
