@@ -4,4 +4,4 @@ A [Nertz](https://en.wikipedia.org/wiki/Nerts) score keeping tool written in Rus
 
 Hosted with Github pages at: [nertz.pro](https://nertz.pro)
 
-<img height=300 src="https://i.imgur.com/fmHScMO.png"/>
+<img height=300 src="https://i.imgur.com/1dUsMsv.png"/>
