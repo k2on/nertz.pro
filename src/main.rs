@@ -63,11 +63,15 @@ impl State {
     }
 
     fn is_game_over(&self) -> bool {
-        self.players
+        let mut scores = self
+            .players
             .iter()
             .enumerate()
-            .map(|(idx, _)| self.player_sum(idx))
-            .any(|score| score >= self.first_to as i8)
+            .map(|(idx, _)| self.player_sum(idx));
+        let max = &scores.clone().max().unwrap();
+        let game_has_reached_max_score = scores.any(|score| score >= self.first_to as i8);
+        let no_tie = scores.filter(|score| score.eq(max)).count().ne(&1);
+        game_has_reached_max_score && no_tie
     }
 }
 
