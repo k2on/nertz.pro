@@ -82,22 +82,26 @@ impl State {
             .enumerate()
             .map(|(idx, _)| self.player_sum(idx));
 
-        console::log!(to_string(&format!("{:?}", scores.clone().collect::<Vec<i8>>())).unwrap());
+        if scores.len() == 0 {
+            return false;
+        }
+
+        // console::log!(to_string(&format!("{:?}", scores.clone().collect::<Vec<i8>>())).unwrap());
         let max = &scores.clone().max().unwrap();
         let h = scores
             .clone()
             .filter(|score| score.eq(max))
             .collect::<Vec<i8>>();
 
-        console::log!(to_string(&format!("{:?}", h)).unwrap());
+        // console::log!(to_string(&format!("{:?}", h)).unwrap());
 
         let game_has_reached_max_score = scores.any(|score| score >= self.first_to as i8);
 
-        console::log!(to_string(&format!("{:?}", h.iter().count())).unwrap());
+        // console::log!(to_string(&format!("{:?}", h.iter().count())).unwrap());
 
         let no_tie = h.iter().count().eq(&1);
 
-        console::log!(to_string(&format!("{} {}", game_has_reached_max_score, no_tie)).unwrap());
+        // console::log!(to_string(&format!("{} {}", game_has_reached_max_score, no_tie)).unwrap());
 
         game_has_reached_max_score && no_tie
     }
