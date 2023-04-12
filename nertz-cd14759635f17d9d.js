@@ -641,12 +641,12 @@ function getImports() {
     imports.wbg.__wbindgen_throw = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
     };
-    imports.wbg.__wbindgen_closure_wrapper319 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 121, __wbg_adapter_18);
+    imports.wbg.__wbindgen_closure_wrapper328 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 124, __wbg_adapter_18);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper672 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 243, __wbg_adapter_21);
+    imports.wbg.__wbindgen_closure_wrapper682 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 246, __wbg_adapter_21);
         return addHeapObject(ret);
     };
 
@@ -684,7 +684,7 @@ function initSync(module) {
 
 async function init(input) {
     if (typeof input === 'undefined') {
-        input = new URL('nertz-d586586bace05c0e_bg.wasm', import.meta.url);
+        input = new URL('nertz-cd14759635f17d9d_bg.wasm', import.meta.url);
     }
     const imports = getImports();
 
