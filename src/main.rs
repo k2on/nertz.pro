@@ -1,3 +1,4 @@
+use colorgrad::{Color, CustomGradient, Gradient};
 use std::collections::HashMap;
 
 use gloo::{
@@ -15,6 +16,8 @@ struct State {
     scores: Vec<Vec<Score>>,
     is_in_progress: bool,
     first_to: u8,
+    negative_size: u8,
+    deck_size: u8,
 }
 
 type Player = String;
@@ -28,6 +31,7 @@ pub struct App {
     state: State,
     refs: HashMap<String, NodeRef>,
     leaderboard: Leaderboard,
+    gradient: Gradient,
 }
 
 type Leaderboard = Vec<usize>;
@@ -39,6 +43,8 @@ impl State {
             scores: Vec::new(),
             is_in_progress: false,
             first_to: 100, // the game ends when a player hits this number
+            negative_size: 13,
+            deck_size: 52,
         }
     }
 
@@ -229,10 +235,20 @@ impl Component for App {
         let refs = make_refs(&state);
         let leaderboard = state.get_leader_board();
 
+        let red = Color::from_rgba8(255, 0, 0, 255);
+        let green = Color::from_rgba8(0, 255, 0, 255);
+        let blue = Color::from_rgba8(0, 212, 255, 255);
+
+        let gradient = CustomGradient::new()
+            .colors(&[red, green, blue])
+            .build()
+            .unwrap();
+
         Self {
             state,
             refs,
             leaderboard,
+            gradient,
         }
     }
 
@@ -363,14 +379,15 @@ impl Component for App {
                                 }
                             } else {
                                 html! {
-                                    {if let Some(s) = score.val {
-                                        let mut class = Classes::from("score");
-                                        if s < 0 {
-                                            class.push("red");
-                                        }
+                                    {if let Some(score) = score.val {
+                                        let class = Classes::from("score");
+
+                                        let percent: f64 = (score as f64 + self.state.negative_size as f64) / self.state.deck_size as f64;
+                                        let color = self.gradient.at(percent).to_hex_string();
+                                        let style = "color: ".to_owned() + &color;
 
                                         html! {
-                                            <span {class}>{s.to_string()}</span>
+                                            <span {style} {class}>{score.to_string()}</span>
                                         }
                                     } else {
                                         html! {
