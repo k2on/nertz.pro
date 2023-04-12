@@ -205,6 +205,34 @@ impl App {
         }
     }
 
+    fn find_unique_prefix(&self, idx: usize) -> String {
+        let current_name = self.state.players.get(idx).unwrap();
+        let mut prefix_len = 1;
+
+        while prefix_len <= current_name.len() {
+            let current_prefix = &current_name[..prefix_len];
+            let mut is_unique = true;
+
+            for (other_idx, other_name) in self.state.players.iter().enumerate() {
+                if other_idx != idx {
+                    let other_prefix = &other_name[..std::cmp::min(prefix_len, other_name.len())];
+                    if current_prefix.to_lowercase() == other_prefix.to_lowercase() {
+                        is_unique = false;
+                        break;
+                    }
+                }
+            }
+
+            if is_unique {
+                return current_prefix.to_string();
+            }
+
+            prefix_len += 1;
+        }
+
+        current_name.to_string()
+    }
+
     fn get_next_empty(&mut self) -> Option<&mut Score> {
         self.state
             .scores
@@ -315,7 +343,7 @@ impl Component for App {
         let is_game_over = self.state.is_game_over();
 
         html! {
-            <div>
+            <div class="container">
                 <img id="logo" src="static/logo.png" alt="NERTS.PRO"/>
                 {if self.state.is_in_progress {
                     html! {
@@ -344,7 +372,7 @@ impl Component for App {
                         } else {
                             html! {}
                         }}
-                        {player.clone().chars().nth(0).unwrap().to_uppercase()}
+                        {self.find_unique_prefix(idx)}
                         {if is_game_over { html! { <><br/><br/></> } } else { html! {} }}
                         {self.view_player_sum(idx)}</td>
                     }) }
@@ -412,6 +440,7 @@ impl Component for App {
                     }
 
                 } else {
+                    let disabled = self.state.players.len() < 2;
                     html! {
                         <div>
 
@@ -420,10 +449,9 @@ impl Component for App {
                             </ul>
                             {self.view_input(ctx.link())}
 
-
-                <div class="button">
-                    <button onclick={ctx.link().callback(move |_| AppMsg::GameStart)}>{"START GAME"}</button>
-                </div>
+                            <div class="button">
+                                <button {disabled} onclick={ctx.link().callback(move |_| AppMsg::GameStart)}>{"START GAME"}</button>
+                            </div>
                         </div>
                     }
 

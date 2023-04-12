@@ -17,6 +17,18 @@
                 margin: 0;
             }
 
+            .container {
+                max-width: 15em;
+                margin: auto;
+            }
+
+            input {
+                background: #444;
+                border: none;
+                font-family: phont;
+                color: white;
+            }
+
             button.remove {
                 margin-left: 0.5em;
                 color: red;
@@ -28,6 +40,9 @@
 
             .new-player {
                 font-size: 1em;
+                width: 100%;
+                width: calc(100% - 2em);
+                padding: 0.2em 1em;
             }
 
             .start {
@@ -48,11 +63,12 @@
 
             .scores td {
                 text-align: center;
+                position: relative;
             }
 
             .scores input {
                 width: 90%;
-                font-size: 1.5em;
+                font-size: 1em;
                 text-align: center;
                 font-family: phont;
             }
@@ -77,11 +93,16 @@
                 border: none;
                 color: white;
             }
+            .button button:disabled {
+                background: grey;
+                color: darkgrey;
+            }
             img.metal {
                 width: 30px;
                 position: absolute;
                 z-index: -1;
-                margin-left: -6px;
+                left: 17px;
+                top: 3px;
             }
         </style>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
